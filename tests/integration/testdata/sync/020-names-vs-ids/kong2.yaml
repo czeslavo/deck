@@ -14,3 +14,6 @@ services:
         https_redirect_status_code: 301
         paths:
           - /r1
+consumers:
+  - id: 5a1e49a8-2536-41fa-a4e9-605bf218a4fa
+    username: yolo

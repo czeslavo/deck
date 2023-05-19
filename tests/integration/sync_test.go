@@ -12,9 +12,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/kong/go-kong/kong"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/kong/go-kong/kong"
 
 	"github.com/kong/deck/utils"
 )
@@ -3116,40 +3117,20 @@ func Test_Sync_Names_vs_IDs(t *testing.T) {
 	err = sync("testdata/sync/020-names-vs-ids/kong2.yaml")
 	require.NoError(t, err)
 
+	svc := svc1_207[0].DeepCopy()
+	svc.ID = kong.String("18076db2-28b6-423b-ba39-a797193017f7")
+
+	route := route1_20x[0].DeepCopy()
+	route.ID = kong.String("17b6a97e-f3f7-4c47-857a-7464cb9e202b")
+	route.Service.ID = kong.String("18076db2-28b6-423b-ba39-a797193017f7")
+
+	consumer := consumer[0].DeepCopy()
+	consumer.ID = kong.String("5a1e49a8-2536-41fa-a4e9-605bf218a4fa")
+
 	expectedState := utils.KongRawState{
-		Services: []*kong.Service{
-			{
-				ID:             kong.String("18076db2-28b6-423b-ba39-a797193017f7"),
-				Name:           kong.String("svc1"),
-				ConnectTimeout: kong.Int(60000),
-				Host:           kong.String("mockbin.org"),
-				Port:           kong.Int(80),
-				Protocol:       kong.String("http"),
-				ReadTimeout:    kong.Int(60000),
-				Retries:        kong.Int(5),
-				WriteTimeout:   kong.Int(60000),
-				Enabled:        kong.Bool(true),
-				Tags:           nil,
-			},
-		},
-		Routes: []*kong.Route{
-			{
-				ID:                      kong.String("17b6a97e-f3f7-4c47-857a-7464cb9e202b"),
-				Name:                    kong.String("r1"),
-				Paths:                   []*string{kong.String("/r1")},
-				PathHandling:            kong.String("v0"),
-				PreserveHost:            kong.Bool(false),
-				Protocols:               []*string{kong.String("http"), kong.String("https")},
-				RegexPriority:           kong.Int(0),
-				StripPath:               kong.Bool(true),
-				HTTPSRedirectStatusCode: kong.Int(301),
-				RequestBuffering:        kong.Bool(true),
-				ResponseBuffering:       kong.Bool(true),
-				Service: &kong.Service{
-					ID: kong.String("18076db2-28b6-423b-ba39-a797193017f7"),
-				},
-			},
-		},
+		Services:  []*kong.Service{svc},
+		Routes:    []*kong.Route{route},
+		Consumers: []*kong.Consumer{consumer},
 	}
 
 	testKongState(t, client, false, expectedState, nil)

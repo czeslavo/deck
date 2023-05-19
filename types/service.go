@@ -58,7 +58,7 @@ func (s *serviceCRUD) Update(ctx context.Context, arg ...crud.Arg) (crud.Arg, er
 	event := crud.EventFromArg(arg[0])
 	service := serviceFromStruct(event)
 
-	updatedService, err := s.client.Services.Create(ctx, &service.Service)
+	updatedService, err := s.client.Services.Update(ctx, &service.Service)
 	if err != nil {
 		return nil, err
 	}
@@ -116,12 +116,12 @@ func (d *serviceDiffer) CreateAndUpdates(handler func(crud.Event) error) error {
 	}
 
 	for _, service := range targetServices {
-		n, err := d.createUpdateService(service)
+		event, err := d.createUpdateService(service)
 		if err != nil {
 			return err
 		}
-		if n != nil {
-			err = handler(*n)
+		if event != nil {
+			err = handler(*event)
 			if err != nil {
 				return err
 			}
@@ -154,6 +154,64 @@ func (d *serviceDiffer) createUpdateService(service *state.Service) (*crud.Event
 			Obj:    serviceCopy,
 			OldObj: currentService,
 		}, nil
+	}
+	return nil, nil
+}
+
+func (d *serviceDiffer) DuplicateDeletes(handler func(crud.Event) error) error {
+	targetServices, err := d.targetState.Services.GetAll()
+	if err != nil {
+		return fmt.Errorf("error fetching services from state: %w", err)
+	}
+	for _, service := range targetServices {
+		events, err := d.deleteDuplicateService(service)
+		if err != nil {
+			return err
+		}
+		for _, event := range events {
+			if event != nil {
+				err = handler(*event)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (d *serviceDiffer) deleteDuplicateService(targetService *state.Service) ([]*crud.Event, error) {
+	currentService, err := d.currentState.Services.Get(*targetService.Name)
+	if err == state.ErrNotFound {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("error looking up service %q: %w",
+			*targetService.Name, err)
+	}
+
+	if *currentService.ID != *targetService.ID {
+		routesToDelete, err := d.currentState.Routes.GetAllByServiceID(*currentService.ID)
+		if err != nil {
+			return nil, fmt.Errorf("error looking up routes for service %q: %w",
+				*currentService.Name, err)
+		}
+
+		var events []*crud.Event
+		for _, route := range routesToDelete {
+			events = append(events, &crud.Event{
+				Op:   crud.Delete,
+				Kind: "route",
+				Obj:  route,
+			})
+		}
+		// delete the current service and all of its children
+		return append(events, &crud.Event{
+			Op:   crud.Delete,
+			Kind: "service",
+			Obj:  currentService,
+		}), nil
 	}
 	return nil, nil
 }

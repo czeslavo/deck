@@ -14,6 +14,11 @@ type Differ interface {
 	CreateAndUpdates(func(crud.Event) error) error
 }
 
+type DuplicatesDiffer interface {
+	Differ
+	DuplicateDeletes(func(crud.Event) error) error
+}
+
 type Entity interface {
 	Type() EntityType
 	CRUDActions() crud.Actions
